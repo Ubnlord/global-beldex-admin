@@ -16,7 +16,11 @@ function date(v:any){return v?new Date(v).toLocaleString():"—";}
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[checking,setChecking]=useState(true),[allowed,setAllowed]=useState(false);
- const [page,setPage]=useState<Page>("dashboard"),[mobile,setMobile]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const getPageFromHash=():Page=>{
+   const value=window.location.hash.replace(/^#\\/?/,"") as Page;
+   return pages.some(p=>p.id===value)?value:"dashboard";
+ };
+ const [page,setPage]=useState<Page>(()=>getPageFromHash()),[mobile,setMobile]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const [email,setEmail]=useState(""),[password,setPassword]=useState(""),[loginBusy,setLoginBusy]=useState(false);
  const [users,setUsers]=useState<Row[]>([]),[txs,setTxs]=useState<Row[]>([]),[investments,setInvestments]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[query,setQuery]=useState("");
  const [selected,setSelected]=useState<Row|null>(null),[reason,setReason]=useState("");
@@ -46,7 +50,32 @@ export default function App(){
    const auditRows=[...(a.data||[]).map((x:Row)=>({...x,audit_type:"admin"})),...(ta.data||[]).map((x:Row)=>({...x,audit_type:"transaction"}))].sort((x:Row,y:Row)=>new Date(y.created_at).getTime()-new Date(x.created_at).getTime());
    setUsers(u.data||[]);setTxs(t.data||[]);setInvestments(i.data||[]);setAudit(auditRows);setBusy(false);
  }
- useEffect(()=>{if(allowed)load()},[allowed]);
+ useEffect(()=>{
+   if(!allowed)return;
+   load();
+   const refresh=()=>{if(document.visibilityState==="visible")load()};
+   const interval=window.setInterval(refresh,30000);
+   window.addEventListener("focus",refresh);
+   document.addEventListener("visibilitychange",refresh);
+   return()=>{
+     window.clearInterval(interval);
+     window.removeEventListener("focus",refresh);
+     document.removeEventListener("visibilitychange",refresh);
+   };
+ },[allowed]);
+
+ useEffect(()=>{
+   const onHashChange=()=>setPage(getPageFromHash());
+   window.addEventListener("hashchange",onHashChange);
+   if(window.location.hash!==`#/${page}`)window.history.replaceState(null,"",`#/${page}`);
+   return()=>window.removeEventListener("hashchange",onHashChange);
+ },[]);
+
+ function navigate(next:Page){
+   setPage(next);
+   window.location.hash=`/${next}`;
+   setMobile(false);
+ }
  const stats=useMemo(()=>({users:users.length,blocked:users.filter(x=>x.blocked).length,pending:txs.filter(x=>String(x.status).toLowerCase().includes("pending")||String(x.status).toLowerCase().includes("await")).length,active:investments.filter((x:Row)=>x.status==="active").length}),[users,txs,investments]);
  async function rpc(name:string,args:Row){setBusy(true);setError("");setNotice("");const {error}=await supabase.rpc(name,args);if(error)setError(error.message);else{setNotice("Action completed successfully.");await load();setSelected(null);setReason("");setAmount("")}setBusy(false);}
  function chooseUser(u:Row){setSelected(u);setAmount("");setReason("");setBlock(Boolean(u.blocked));}
@@ -59,7 +88,7 @@ export default function App(){
   async function settle(id:string,type:"deposit"|"withdrawal"){if(!reason.trim()){setError("A settlement reason is required.");return;}await confirmAction(`SETTLE ${type.toUpperCase()}\\n\\nTransaction: ${id.slice(0,8)}…\\nReason: ${reason.trim()}\\n\\nContinue?`,()=>rpc("admin_settle_transaction",{p_transaction_id:id,p_reason:reason.trim()}));}
  if(checking)return <div className="center"><div className="loader"/>Checking administrator access…</div>;
  if(!session||!allowed)return <Login email={email} password={password} setEmail={setEmail} setPassword={setPassword} login={login} busy={loginBusy} error={error}/>;
- const nav=<aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><ShieldCheck/><div><b>GLOBAL BELDEX</b><span>ADMIN CONSOLE</span></div><button className="icon mobileOnly" onClick={()=>setMobile(false)}><XCircle size={18}/></button></div><nav>{pages.map(p=>{const I=p.icon;return <button key={p.id} className={page===p.id?"nav active":"nav"} onClick={()=>{setPage(p.id);setMobile(false)}}><I size={18}/>{p.label}<ChevronRight size={14}/></button>})}</nav><div className="sidebarBottom"><div className="secure"><ShieldCheck size={16}/><span>Database-authorized</span></div><button className="logout" onClick={logout}><LogOut size={16}/>Sign out</button></div></aside>;
+ const nav=<aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><ShieldCheck/><div><b>GLOBAL BELDEX</b><span>ADMIN CONSOLE</span></div><button className="icon mobileOnly" onClick={()=>setMobile(false)}><XCircle size={18}/></button></div><nav>{pages.map(p=>{const I=p.icon;return <button key={p.id} className={page===p.id?"nav active":"nav"} onClick={()=>navigate(p.id)}><I size={18}/>{p.label}<ChevronRight size={14}/></button>})}</nav><div className="sidebarBottom"><div className="secure"><ShieldCheck size={16}/><span>Database-authorized</span></div><button className="logout" onClick={logout}><LogOut size={16}/>Sign out</button></div></aside>;
  return <div className="app">{nav}<main className="main"><header><button className="icon mobileOnly" onClick={()=>setMobile(true)}><Menu/></button><div><div className="eyebrow">SECURE OPERATIONS</div><h1>{pages.find(x=>x.id===page)?.label}</h1></div><div className="headerActions"><button className="icon" onClick={load} title="Refresh"><RefreshCw size={17}/></button><span className="adminEmail">{session.user.email}</span></div></header>{error&&<div className="alert error"><XCircle size={17}/>{error}</div>}{notice&&<div className="alert success"><CheckCircle2 size={17}/>{notice}</div>}{page==="dashboard"&&<Dashboard stats={stats} txs={txs} users={users}/>} {page==="users"&&<UsersPage users={users} query={query} setQuery={setQuery} chooseUser={chooseUser}/>} {page==="deposits"&&<Queue rows={txs.filter(x=>x.type==="deposit")} kind="deposit" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="withdrawals"&&<Queue rows={txs.filter(x=>x.type==="withdraw")} kind="withdrawal" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="investments"&&<Investments rows={investments}/>} {page==="transactions"&&<Transactions rows={txs}/>} {page==="audit"&&<Audit rows={audit}/>} {selected&&<UserModal user={selected} amount={amount} setAmount={setAmount} reason={reason} setReason={setReason} fund={fund} adjust={adjust} toggleBlock={toggleBlock} close={()=>setSelected(null)} busy={busy}/>}</main></div>
 }
 
