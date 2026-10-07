@@ -17,7 +17,7 @@ function date(v:any){return v?new Date(v).toLocaleString():"—";}
 export default function App(){
  const [session,setSession]=useState<any>(null),[checking,setChecking]=useState(true),[allowed,setAllowed]=useState(false);
  const getPageFromHash=():Page=>{
-   const value=window.location.hash.replace(/^#\\/?/,"") as Page;
+   const value=window.location.hash.replace(/^#\/?/,"") as Page;
    return pages.some(p=>p.id===value)?value:"dashboard";
  };
  const [page,setPage]=useState<Page>(()=>getPageFromHash()),[mobile,setMobile]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
