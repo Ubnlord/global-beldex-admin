@@ -26,6 +26,8 @@ export default function App(){
  const [selected,setSelected]=useState<Row|null>(null),[reason,setReason]=useState("");
  const [amount,setAmount]=useState(""),[block,setBlock]=useState(false);
  const [notice,setNotice]=useState("");
+ const [liveAlert,setLiveAlert]=useState("");
+ const [notificationSound,setNotificationSound]=useState(true);
 
  async function checkUser(s:any){
    if(!s){setAllowed(false);setChecking(false);return;}
@@ -62,7 +64,26 @@ export default function App(){
      window.removeEventListener("focus",refresh);
      document.removeEventListener("visibilitychange",refresh);
    };
- },[allowed]);
+ },[allowed]); useEffect(()=>{
+   if(!allowed)return;
+   const channel=supabase
+     .channel("admin-transaction-notifications")
+     .on("postgres_changes",{event:"*",schema:"public",table:"transaction"},(payload)=>{
+       const row:any=payload.new||payload.old||{};
+       const type=String(row.type||"transaction");
+       const amount=Number(row.amount||0);
+       const label=type==="deposit"?"Deposit":type==="withdraw"?"Withdrawal":type==="bonus"?"Balance credit":type==="plan"?"Investment plan":"Transaction";
+       const amountText=Number.isFinite(amount)&&amount>0?" · USD "+fmt(amount):"";
+       const message=label+amountText+" changed to "+String(row.status||"updated")+" for user "+String(row.user_id||"").slice(0,8)+"…";
+       setLiveAlert(message);
+       window.setTimeout(()=>setLiveAlert(current=>current===message?"":current),7000);
+       if(notificationSound)playAdminNotificationSound();
+       showAdminNotification("GLOBAL BELDEX Admin",message);
+       void load();
+     })
+     .subscribe();
+   return()=>{void supabase.removeChannel(channel)};
+ },[allowed,notificationSound]);
 
  useEffect(()=>{
    const onHashChange=()=>setPage(getPageFromHash());
@@ -89,7 +110,34 @@ export default function App(){
  if(checking)return <div className="center"><div className="loader"/>Checking administrator access…</div>;
  if(!session||!allowed)return <Login email={email} password={password} setEmail={setEmail} setPassword={setPassword} login={login} busy={loginBusy} error={error}/>;
  const nav=<aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><ShieldCheck/><div><b>GLOBAL BELDEX</b><span>ADMIN CONSOLE</span></div><button className="icon mobileOnly" onClick={()=>setMobile(false)}><XCircle size={18}/></button></div><nav>{pages.map(p=>{const I=p.icon;return <button key={p.id} className={page===p.id?"nav active":"nav"} onClick={()=>navigate(p.id)}><I size={18}/>{p.label}<ChevronRight size={14}/></button>})}</nav><div className="sidebarBottom"><div className="secure"><ShieldCheck size={16}/><span>Database-authorized</span></div><button className="logout" onClick={logout}><LogOut size={16}/>Sign out</button></div></aside>;
- return <div className="app">{nav}<main className="main"><header><button className="icon mobileOnly" onClick={()=>setMobile(true)}><Menu/></button><div><div className="eyebrow">SECURE OPERATIONS</div><h1>{pages.find(x=>x.id===page)?.label}</h1></div><div className="headerActions"><button className="icon" onClick={load} title="Refresh"><RefreshCw size={17}/></button><span className="adminEmail">{session.user.email}</span></div></header>{error&&<div className="alert error"><XCircle size={17}/>{error}</div>}{notice&&<div className="alert success"><CheckCircle2 size={17}/>{notice}</div>}{page==="dashboard"&&<Dashboard stats={stats} txs={txs} users={users}/>} {page==="users"&&<UsersPage users={users} query={query} setQuery={setQuery} chooseUser={chooseUser}/>} {page==="deposits"&&<Queue rows={txs.filter(x=>x.type==="deposit")} kind="deposit" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="withdrawals"&&<Queue rows={txs.filter(x=>x.type==="withdraw")} kind="withdrawal" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="investments"&&<Investments rows={investments}/>} {page==="transactions"&&<Transactions rows={txs}/>} {page==="audit"&&<Audit rows={audit}/>} {selected&&<UserModal user={selected} amount={amount} setAmount={setAmount} reason={reason} setReason={setReason} fund={fund} adjust={adjust} toggleBlock={toggleBlock} close={()=>setSelected(null)} busy={busy}/>}</main></div>
+ return <div className="app">{nav}<main className="main"><header><button className="icon mobileOnly" onClick={()=>setMobile(true)}><Menu/></button><div><div className="eyebrow">SECURE OPERATIONS</div><h1>{pages.find(x=>x.id===page)?.label}</h1></div><div className="headerActions"><button className="icon" onClick={load} title="Refresh"><RefreshCw size={17}/></button><button className="soundBtn" onClick={async()=>{setNotificationSound(v=>!v);if(!notificationSound){await enableAdminNotifications();playAdminNotificationSound()}}} title="Toggle notification sound">{notificationSound?"🔊":"🔇"}</button><span className="adminEmail">{session.user.email}</span></div></header>{error&&<div className="alert error"><XCircle size={17}/>{error}</div>}{notice&&<div className="alert success"><CheckCircle2 size={17}/>{notice}</div>}{liveAlert&&<div className="alert success"><Activity size={17}/><span><b>LIVE</b> {liveAlert}</span></div>}{page==="dashboard"&&<Dashboard stats={stats} txs={txs} users={users}/>} {page==="users"&&<UsersPage users={users} query={query} setQuery={setQuery} chooseUser={chooseUser}/>} {page==="deposits"&&<Queue rows={txs.filter(x=>x.type==="deposit")} kind="deposit" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="withdrawals"&&<Queue rows={txs.filter(x=>x.type==="withdraw")} kind="withdrawal" approve={approve} reject={reject} settle={settle} reason={reason} setReason={setReason} busy={busy}/>} {page==="investments"&&<Investments rows={investments}/>} {page==="transactions"&&<Transactions rows={txs}/>} {page==="audit"&&<Audit rows={audit}/>} {selected&&<UserModal user={selected} amount={amount} setAmount={setAmount} reason={reason} setReason={setReason} fund={fund} adjust={adjust} toggleBlock={toggleBlock} close={()=>setSelected(null)} busy={busy}/>}</main></div>
+}
+
+function playAdminNotificationSound(){
+ try{
+   const AudioCtx=window.AudioContext||(window as typeof window & {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+   if(!AudioCtx)return;
+   const ctx=new AudioCtx();
+   const now=ctx.currentTime;
+   const osc=ctx.createOscillator();
+   const gain=ctx.createGain();
+   osc.type="sine";
+   osc.frequency.setValueAtTime(880,now);
+   osc.frequency.setValueAtTime(1175,now+0.08);
+   gain.gain.setValueAtTime(0.0001,now);
+   gain.gain.exponentialRampToValueAtTime(0.12,now+0.015);
+   gain.gain.exponentialRampToValueAtTime(0.0001,now+0.22);
+   osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.24);
+   window.setTimeout(()=>void ctx.close(),400);
+ }catch{}
+}
+async function enableAdminNotifications(){
+ if(typeof Notification==="undefined")return;
+ if(Notification.permission==="default")await Notification.requestPermission();
+}
+function showAdminNotification(title:string,body:string){
+ if(typeof Notification==="undefined"||Notification.permission!=="granted")return;
+ try{new Notification(title,{body,icon:"/favicon.ico",tag:"global-beldex-admin-live"})}catch{}
 }
 
 function Login(p:any){return <div className="login"><div className="loginCard"><div className="logo"><ShieldCheck size={32}/></div><div className="eyebrow">GLOBAL BELDEX</div><h1>Administrator sign in</h1><p>Restricted console. Your Supabase account must be authorized in the admin database.</p><form onSubmit={p.login}><label>Email<input type="email" value={p.email} onChange={e=>p.setEmail(e.target.value)} required autoComplete="username"/></label><label>Password<input type="password" value={p.password} onChange={e=>p.setPassword(e.target.value)} required autoComplete="current-password"/></label>{p.error&&<div className="formError">{p.error}</div>}<button className="primary" disabled={p.busy}>{p.busy?"Signing in…":"Sign in securely"}</button></form><small>Financial actions are executed by protected PostgreSQL RPCs. No service-role key is shipped to this browser.</small></div></div>}
