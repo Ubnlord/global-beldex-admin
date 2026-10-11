@@ -23,6 +23,11 @@ test("admin UI financial actions call the expected protected RPCs", () => {
   }
 });
 
+test("unknown transaction currency is not silently labeled USD", () => {
+  assert.ok(app.includes("Review currency (missing)"));
+  assert.ok(app.includes("manual reconciliation required"));
+});
+
 test("investment management is not mutated directly by the browser", () => {
   assert.ok(!/from\(["']user_investment["']\)\s*\.\s*(update|insert|upsert|delete)\s*\(/.test(app),
     "investment rows must not be mutated directly from the browser");
