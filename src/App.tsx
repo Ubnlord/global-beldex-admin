@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {supabase} from "./lib/supabase";
-import {Activity,ArrowDownToLine,ArrowUpFromLine,BarChart3,Blocks,CheckCircle2,ChevronRight,Coins,FileClock,LayoutDashboard,LogOut,Menu,RefreshCw,Search,ShieldCheck,UserRound,Users,WalletCards,XCircle} from "lucide-react";
+import {Activity,ArrowDownToLine,ArrowUpFromLine,BarChart3,Blocks,CheckCircle2,ChevronRight,Coins,FileClock,LayoutDashboard,LogOut,Menu,RefreshCw,Search,ShieldCheck,Users,WalletCards,XCircle} from "lucide-react";
 
 type Page="dashboard"|"users"|"deposits"|"withdrawals"|"investments"|"transactions"|"audit";
 type Row=Record<string,any>;
@@ -25,7 +25,7 @@ export default function App(){
  const [email,setEmail]=useState(""),[password,setPassword]=useState(""),[loginBusy,setLoginBusy]=useState(false);
  const [users,setUsers]=useState<Row[]>([]),[txs,setTxs]=useState<Row[]>([]),[investments,setInvestments]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[query,setQuery]=useState("");
  const [selected,setSelected]=useState<Row|null>(null),[reason,setReason]=useState("");
- const [amount,setAmount]=useState(""),[block,setBlock]=useState(false);
+ const [amount,setAmount]=useState("");
  const [notice,setNotice]=useState("");
  const [liveAlert,setLiveAlert]=useState("");
  const [notificationSound,setNotificationSound]=useState(true);
@@ -130,7 +130,7 @@ function playAdminNotificationSound(){
    gain.gain.exponentialRampToValueAtTime(0.0001,now+0.22);
    osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.24);
    window.setTimeout(()=>void ctx.close(),400);
- }catch{}
+ }catch(error){console.debug("Admin notification sound unavailable",error)}
 }
 async function enableAdminNotifications(){
  if(typeof Notification==="undefined")return;
@@ -138,7 +138,7 @@ async function enableAdminNotifications(){
 }
 function showAdminNotification(title:string,body:string){
  if(typeof Notification==="undefined"||Notification.permission!=="granted")return;
- try{new Notification(title,{body,icon:"/favicon.ico",tag:"global-beldex-admin-live"})}catch{}
+ try{new Notification(title,{body,icon:"/favicon.ico",tag:"global-beldex-admin-live"})}catch(error){console.debug("Browser notification unavailable",error)}
 }
 
 function Login(p:any){return <div className="login"><div className="loginCard"><div className="logo"><ShieldCheck size={32}/></div><div className="eyebrow">GLOBAL BELDEX</div><h1>Administrator sign in</h1><p>Restricted console. Your Supabase account must be authorized in the admin database.</p><form onSubmit={p.login}><label>Email<input type="email" value={p.email} onChange={e=>p.setEmail(e.target.value)} required autoComplete="username"/></label><label>Password<input type="password" value={p.password} onChange={e=>p.setPassword(e.target.value)} required autoComplete="current-password"/></label>{p.error&&<div className="formError">{p.error}</div>}<button className="primary" disabled={p.busy}>{p.busy?"Signing in…":"Sign in securely"}</button></form><small>Financial actions are executed by protected PostgreSQL RPCs. No service-role key is shipped to this browser.</small></div></div>}
