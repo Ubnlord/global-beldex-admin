@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {supabase} from "./lib/supabase";
-import {Activity,ArrowDownToLine,ArrowUpFromLine,BarChart3,Blocks,CheckCircle2,ChevronRight,Coins,FileClock,LayoutDashboard,LogOut,Menu,RefreshCw,Search,ShieldCheck,UserRound,Users,WalletCards,XCircle} from "lucide-react";
+import {Activity,ArrowDownToLine,ArrowUpFromLine,BarChart3,Blocks,CheckCircle2,ChevronRight,Coins,FileClock,LayoutDashboard,LogOut,Menu,RefreshCw,Search,ShieldCheck,Users,WalletCards,XCircle} from "lucide-react";
 
 type Page="dashboard"|"users"|"deposits"|"withdrawals"|"investments"|"transactions"|"audit";
 type Row=Record<string,any>;
@@ -101,7 +101,7 @@ export default function App(){
  }
  const stats=useMemo(()=>({users:users.length,blocked:users.filter(x=>x.blocked).length,pending:txs.filter(x=>String(x.status).toLowerCase().includes("pending")||String(x.status).toLowerCase().includes("await")).length,active:investments.filter((x:Row)=>x.status==="active").length}),[users,txs,investments]);
  async function rpc(name:string,args:Row){setBusy(true);setError("");setNotice("");const {error}=await supabase.rpc(name,args);if(error)setError(error.message);else{setNotice("Action completed successfully.");await load();setSelected(null);setReason("");setAmount("");setReference("")}setBusy(false);}
- function chooseUser(u:Row){setSelected(u);setAmount("");setReason("");setReference(crypto.randomUUID());setBlock(Boolean(u.blocked));}
+ function chooseUser(u:Row){setSelected(u);setAmount("");setReason("");setReference(crypto.randomUUID());}
  async function confirmAction(message:string,action:()=>Promise<void>){if(!window.confirm(message))return;await action();}
  async function fund(){if(!selected)return;const n=Number(amount);const ref=reference.trim()||crypto.randomUUID();setReference(ref);if(!Number.isFinite(n)||n<=0||!reason.trim()){setError("Enter a positive BDX credit and a reason.");return;}await confirmAction(`CREDIT BDX WALLET\\n\\nUser: ${selected.email||selected.user_id}\\nAmount: BDX ${fmt(n)}\\nReason: ${reason.trim()}\\nReference: ${ref}\\n\\nContinue?`,()=>rpc("admin_adjust_bdx_balance",{p_user_id:selected.user_id,p_delta:n,p_reason:reason.trim(),p_reference:ref}));}
  async function adjust(){if(!selected)return;const n=Number(amount);const ref=reference.trim()||crypto.randomUUID();setReference(ref);if(!Number.isFinite(n)||n===0||!reason.trim()){setError("Enter a non-zero BDX adjustment and a reason.");return;}await confirmAction(`ADJUST BDX WALLET\\n\\nUser: ${selected.email||selected.user_id}\\nChange: ${fmt(n)} BDX\\nReason: ${reason.trim()}\\nReference: ${ref}\\n\\nContinue?`,()=>rpc("admin_adjust_bdx_balance",{p_user_id:selected.user_id,p_delta:n,p_reason:reason.trim(),p_reference:ref}));}
@@ -131,7 +131,7 @@ function playAdminNotificationSound(){
    gain.gain.exponentialRampToValueAtTime(0.0001,now+0.22);
    osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.24);
    window.setTimeout(()=>void ctx.close(),400);
- }catch{}
+ }catch{ /* Audio playback is optional in this console. */ }
 }
 async function enableAdminNotifications(){
  if(typeof Notification==="undefined")return;
@@ -139,7 +139,7 @@ async function enableAdminNotifications(){
 }
 function showAdminNotification(title:string,body:string){
  if(typeof Notification==="undefined"||Notification.permission!=="granted")return;
- try{new Notification(title,{body,icon:"/favicon.ico",tag:"global-beldex-admin-live"})}catch{}
+ try{new Notification(title,{body,icon:"/favicon.ico",tag:"global-beldex-admin-live"})}catch{ /* Browser notifications may be blocked by user or browser policy. */ }
 }
 
 function Login(p:any){return <div className="login"><div className="loginCard"><div className="logo"><ShieldCheck size={32}/></div><div className="eyebrow">GLOBAL BELDEX</div><h1>Administrator sign in</h1><p>Restricted console. Your Supabase account must be authorized in the admin database.</p><form onSubmit={p.login}><label>Email<input type="email" value={p.email} onChange={e=>p.setEmail(e.target.value)} required autoComplete="username"/></label><label>Password<input type="password" value={p.password} onChange={e=>p.setPassword(e.target.value)} required autoComplete="current-password"/></label>{p.error&&<div className="formError">{p.error}</div>}<button className="primary" disabled={p.busy}>{p.busy?"Signing in…":"Sign in securely"}</button></form><small>Financial actions are executed by protected PostgreSQL RPCs. No service-role key is shipped to this browser.</small></div></div>}
