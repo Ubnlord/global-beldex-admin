@@ -24,6 +24,7 @@ export default function App(){
  const [email,setEmail]=useState(""),[password,setPassword]=useState(""),[loginBusy,setLoginBusy]=useState(false);
  const [users,setUsers]=useState<Row[]>([]),[txs,setTxs]=useState<Row[]>([]),[investments,setInvestments]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[query,setQuery]=useState("");
  const [selected,setSelected]=useState<Row|null>(null),[reason,setReason]=useState("");
+ const [amount,setAmount]=useState("");
  const [reference,setReference]=useState("");
  const [notice,setNotice]=useState("");
  const [liveAlert,setLiveAlert]=useState("");
