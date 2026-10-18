@@ -19,8 +19,7 @@ Dashboard, user search/blocking, deposits, withdrawals, investments, transaction
 
 Financial RPCs used by the console include:
 
-- `admin_fund_user`
-- `admin_adjust_balance`
+- `admin_adjust_bdx_balance` (positive deltas credit BDX; negative deltas debit BDX)
 - `admin_approve_deposit`
 - `admin_reject_deposit`
 - `admin_approve_withdrawal`
@@ -28,7 +27,7 @@ Financial RPCs used by the console include:
 - `admin_manage_investment`
 - `admin_set_user_block`
 
-The production Supabase migration containing the new financial admin RPCs must be applied and verified before those controls are used against production data.
+BDX adjustments require a unique reference/idempotency key and a reason. Historical USD balances are displayed for reporting only; this console no longer exposes USD funding or adjustment controls. The production Supabase migrations and the matching admin-console release must be applied and verified before these controls are used against production data.
 
 ## Local development
 
